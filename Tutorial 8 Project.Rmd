@@ -1,0 +1,86 @@
+---
+title: "Tutorial 8"
+author: "Anna Christianson"
+date: "10/23/2019"
+output: 
+html_document:
+  code_folding: hide
+
+---
+#Step 1: Wake up packages
+```{r message=F}
+library(tidyverse)
+library(lubridate)
+library(httpuv)
+library(leaflet)
+```
+#Step 2: Load the data
+```{r message=F}
+stops <- read_csv("https://datajournalism.tech/wp-content/uploads/2019/10/wichita.csv")
+```
+#Step 3: Fix values
+```{r}
+population_2016 <- tibble(subject_race=c("asian/pacific islander","black","hispanic","other/unknown","white"),num_people=c(19294,42485,65090,16686,245499))
+center_lat <- 37.689811
+center_lng <- -97.332332
+```
+#Step 4: Examine the data
+```{r}
+str(stops)
+summary(stops)
+colnames(stops)
+nrow(stops)
+```
+#Step 5: Count stops by race
+```{r}
+stops %>% 
+  count(subject_race)
+stops %>%
+  group_by(subject_race) %>%
+  summarize(n=n(),prop=n/nrow(.))
+```
+#Step 6: Compare to total population
+```{r}
+population_2016 %>%
+  mutate(prop=num_people/sum(num_people))
+```
+#Step 7: Join data
+```{r}
+race <- stops %>%
+  count(subject_race)%>%
+  left_join(population_2016,by="subject_race")%>%
+  mutate(stop_rate=n/num_people)
+```
+#Step 8: Data visualization, bar chart
+```{r}
+bar <- ggplot(race,aes(x=reorder(subject_race,stop_rate),y=stop_rate))+
+  geom_bar(stat="identity", fill="blue")+
+  geom_hline(yintercept=0)+
+  labs(title="Stopped Drivers by Race",subtitle="Wichita, KS 2016")+
+  coord_flip()
+options(scipen=10000)
+
+bar
+```
+
+#Step 9: Data visualization, map
+```{r}
+race <- colorFactor(c("pink", "black", "yellow", "red", "blue"),
+                    domain=c("white", "black", "asian/pacific islander", "hispanic", "other/unknown"),
+                    ordered=TRUE)
+ac <- stops %>% drop_na(lat, lng)
+
+map <- leaflet(ac) %>%
+  addProviderTiles(providers$CartoDB) %>% 
+  setView(lng= -97.318689, lat= 37.683568, zoom=16) %>% 
+  addCircleMarkers(~lng,
+                   ~lat,
+                   popup=paste("This is a/an", ac$subject_race, "and", ac$subject_sex, "driver."),
+                   weight= 3, 
+                   radius=4, 
+                   color=~race(subject_race),
+                   stroke=F,
+                   fillOpacity = 1)
+
+map
+```
